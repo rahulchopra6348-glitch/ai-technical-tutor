@@ -27,7 +27,7 @@ async function sendMessage() {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
-      "Authorization": "581263"
+      "x-api-key": "581263"
     },
     body: JSON.stringify({ message: userMessage })
   });
