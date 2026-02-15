@@ -1,67 +1,146 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>AI Technical Tutor</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Technical Tutor</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            text-align: center;
+            padding: 40px;
+            background: #111;
+            color: white;
+            margin: 0;
+        }
+        h1 { color: #00d4ff; }
+        #chatContainer {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #222;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        #chatBox {
+            border: 1px solid #444;
+            height: 400px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            padding: 15px;
+            text-align: left;
+            background: #1a1a1a;
+            border-radius: 5px;
+            display: flex;
+            flex-direction: column;
+        }
+        .message { margin-bottom: 15px; line-height: 1.5; }
+        .user-msg { color: #00d4ff; font-weight: bold; }
+        .ai-msg { color: #e0e0e0; }
+        .error-msg { color: #ff4d4d; font-weight: bold; }
+        #inputArea { display: flex; gap: 10px; }
+        input {
+            flex-grow: 1;
+            padding: 12px;
+            border-radius: 5px;
+            border: 1px solid #444;
+            background: #333;
+            color: white;
+            outline: none;
+        }
+        button {
+            padding: 10px 20px;
+            background: #00d4ff;
+            border: none;
+            color: black;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        button:hover { background: #0099cc; }
+        button:disabled { background: #555; cursor: not-allowed; }
+        #loading { display: none; color: #888; font-style: italic; font-size: 0.9em; margin-bottom: 10px; text-align: left; }
+    </style>
 </head>
-
-<body style="font-family: Arial; text-align:center; padding:40px; background:#111; color:white;">
+<body>
 
 <h1>AI Technical Tutor</h1>
 
-<div id="chatBox" style="border:1px solid gray; height:300px; overflow:auto; margin-bottom:20px; padding:10px;"></div>
-
-<input id="message" placeholder="Ask something..." style="width:300px; padding:10px;">
-<button id="sendBtn" style="padding:10px;">Send</button>
+<div id="chatContainer">
+    <div id="chatBox"></div>
+    <div id="loading">AI is thinking...</div>
+    
+    <div id="inputArea">
+        <input id="messageInput" placeholder="Ask a technical question..." autocomplete="off">
+        <button id="sendBtn">Send</button>
+    </div>
+</div>
 
 <script>
+    // Using your specific Production URL
+    const webhookURL = "https://rahulchopra.app.n8n.cloud/webhook/62603814-bbcb-47b7-98ac-9875cf5927e1";
 
-const webhookURL = "https://rahulchopra.app.n8n.cloud/webhook/62603814-bbcb-47b7-98ac-9875cf5927e1";
-const apiKey = "581263"; // <-- paste your real key here
+    const chatBox = document.getElementById("chatBox");
+    const messageInput = document.getElementById("messageInput");
+    const sendBtn = document.getElementById("sendBtn");
+    const loadingIndicator = document.getElementById("loading");
 
-async function sendMessage() {
+    async function sendMessage() {
+        const userMessage = messageInput.value.trim();
+        if (!userMessage) return;
 
-  const input = document.getElementById("message");
-  const chatBox = document.getElementById("chatBox");
-  const userMessage = input.value.trim();
+        // 1. Add User Message to UI
+        appendMessage("You", userMessage, "user-msg");
+        messageInput.value = "";
+        
+        // 2. Show Loading State
+        loadingIndicator.style.display = "block";
+        sendBtn.disabled = true;
+        chatBox.scrollTop = chatBox.scrollHeight;
 
-  if (!userMessage) return;
+        try {
+            // 3. Send Data to n8n
+            const response = await fetch(webhookURL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ message: userMessage })
+            });
 
-  chatBox.innerHTML += "<p><b>You:</b> " + userMessage + "</p>";
-  input.value = "";
+            if (!response.ok) {
+                throw new Error(`Connection Error: ${response.status}`);
+            }
 
-  try {
+            const data = await response.json();
 
-    const response = await fetch(webhookURL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": apiKey
-      },
-      body: JSON.stringify({ message: userMessage })
-    });
+            // 4. Handle n8n response (checking your 'reply' key from Screenshot 4)
+            const aiReply = data.reply || data.output || "I received the data but don't have a response text.";
+            appendMessage("AI", aiReply, "ai-msg");
 
-    if (!response.ok) {
-      throw new Error("Server error: " + response.status);
+        } catch (error) {
+            console.error("Fetch Error:", error);
+            appendMessage("Error", error.message, "error-msg");
+        } finally {
+            // 5. Reset UI
+            loadingIndicator.style.display = "none";
+            sendBtn.disabled = false;
+            chatBox.scrollTop = chatBox.scrollHeight;
+            messageInput.focus();
+        }
     }
 
-    const data = await response.json();
+    function appendMessage(sender, text, className) {
+        const msgDiv = document.createElement("div");
+        msgDiv.className = "message";
+        msgDiv.innerHTML = `<span class="${className}">${sender}:</span> ${text}`;
+        chatBox.appendChild(msgDiv);
+    }
 
-    chatBox.innerHTML += "<p><b>AI:</b> " + (data.reply || data.output || JSON.stringify(data)) + "</p>";
-    chatBox.scrollTop = chatBox.scrollHeight;
-
-  } catch (error) {
-    chatBox.innerHTML += "<p style='color:red'><b>Error:</b> " + error.message + "</p>";
-  }
-}
-
-document.getElementById("sendBtn").addEventListener("click", sendMessage);
-
-document.getElementById("message").addEventListener("keypress", function(e) {
-  if (e.key === "Enter") {
-    sendMessage();
-  }
-});
-
+    // Event Listeners
+    sendBtn.addEventListener("click", sendMessage);
+    messageInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") sendMessage();
+    });
 </script>
 
 </body>
